@@ -1,0 +1,456 @@
+{% extends "headerfooter.html" %}
+
+{% block content %}
+
+            <div style="position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1050; margin-top:20px">
+                <div class="toast m-5" role="alert" aria-live="assertive" aria-atomic="true" id="orderSuccessToast" style="background-color: #f4f6f8;color: black;">
+                    <div class="toast-header" style=" background-color: #81c408; color:white">
+                        <strong class="mr-auto">Order Success</strong>
+                        <button type="button" class="mb-1 close" style="margin-left:180" data-dismiss="toast" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="toast-body align-content-center">
+                        Your order has been placed successfully!
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Search Start -->
+            <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-fullscreen">
+                    <div class="modal-content rounded-0">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="exampleModalLabel">Search by keyword</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body d-flex align-items-center">
+                            <div class="input-group w-75 mx-auto d-flex">
+                                <input type="search" class="form-control p-3" placeholder="keywords" aria-describedby="search-icon-1">
+                                <span id="search-icon-1" class="input-group-text p-3"><i class="fa fa-search"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal Search End -->
+
+            <!-- Bestsaler Product Start -->
+            <div class="container-fluid pt-5 mt-5">
+                <div class="container py-5 mt-5" id='recommended_products_container'>
+                    {% comment %} <h1 class="mx-auto mt-5 pt-5">Recommended Products</h1>
+                    <div class="row mt-0 align-items-center">
+                        <div class="col-auto">
+                            <button class="btn btn-primary me-3" id="prevBtn"><i class="fas fa-chevron-left align-middle"></i></button>
+                        </div>
+                        <div class="col">
+                            <div class="d-flex flex-wrap">
+                                <!-- Recommended products will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary" id="nextBtn"><i class="fas fa-chevron-right align-middle"></i></button>
+                        </div>
+                    </div> {% endcomment %}
+                </div>
+            </div>
+            
+            <!-- Fruits Shop Start-->
+            <div class="container-fluid fruite pb-5">
+                <div class="container py-5">
+                    <div class="tab-class text-center">
+                        <div class="row g-4">
+                            <div class="col-lg-4 text-start">
+                                <h1>Our Products</h1>
+                            </div>
+                            <div class="col-lg-8 text-end">
+                                <ul class="nav nav-pills d-inline-flex text-center mb-5" id="admin_exerciseList">
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="tab-content">
+                            <div id="tab-1" class="tab-pane fade show p-0 active">
+                                <div class="row g-4">
+                                    <div class="col-lg-12">
+                                        <div class="row g-4" id="products">                                            
+                                        </div>
+                                        <nav aria-label="Page navigation example">
+                                            <div class="row float-end mt-5">
+                                                <ul class="pagination d-flex w-25" id="paginationControls">
+                                                    {% comment %} <li class="page-item" id="prevPageBtn"><a class="page-link" href="#">Previous</a></li>
+                                                    <!-- Page numbers will be dynamically inserted here -->
+                                                    <li class="page-item" id="nextPageBtn"><a class="page-link" href="#">Next</a></li> {% endcomment %}
+                                                </ul>
+                                            </div>
+                                        </nav> 
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>      
+                </div>
+            </div>
+   
+            <!-- Fruits Shop End-->
+            <div class="loader-container d-flex flex-column align-items-center" id='loader'>
+                <div class="spinner-border mb-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading...</p>
+            </div>
+
+        <script>
+            const API_BASE_URL = "{{ SITE_URL }}";
+            var accessToken = localStorage.getItem("AccessToken");
+            const loaderContainer = document.querySelector('.loader-container');
+            console.log("Access Token is--", accessToken)
+            var decodedToken = ''
+            if (accessToken){
+                decodedToken = jwtDecode(accessToken);
+            } 
+            let currentIndex = 0;
+            function onLoadHandler() {
+                ShowProducts();
+                if(accessToken){
+                    show_recomended_products();
+                }
+            }
+            window.addEventListener("load", onLoadHandler);
+            window.addEventListener("pageshow", function(event) {
+                if (!event.persisted) {
+                    onLoadHandler();
+                }
+            });
+            
+            function updatePaginationControls(totalPages, currentPage) {
+                
+                const paginationControls = document.getElementById('paginationControls');
+                paginationControls.innerHTML = '';
+
+                while (paginationControls.firstChild) {
+                    paginationControls.removeChild(paginationControls.firstChild);
+                }
+                // Add page numbers
+                let startPage = Math.max(1, currentPage - 1);
+                let endPage = Math.min(totalPages, currentPage + 1);
+                if(startPage == 1 && endPage == 2){
+                    endPage = endPage + 1
+                }
+
+                const prevBtn = document.createElement('li');
+                prevBtn.className = 'page-item';
+                const prevBtnLink = document.createElement('a');
+                prevBtnLink.className = 'page-link';
+                prevBtnLink.href = '#';
+                prevBtnLink.textContent = 'Previous';
+                prevBtn.appendChild(prevBtnLink);
+                paginationControls.appendChild(prevBtn);
+
+                for (let i = startPage; i <= endPage; i++) {
+                    const li = document.createElement('li');
+                    li.className = 'page-item';
+                    if (i === currentPage) {
+                        li.classList.add('active');
+                    }
+                    const a = document.createElement('a');
+                    a.className = 'page-link';
+                    a.href = '#';
+                    a.textContent = i;
+                    a.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        ShowProducts(i);
+                    });
+                    li.appendChild(a);
+
+                    paginationControls.appendChild(li);
+                }
+                
+                const nextBtn = document.createElement('li');
+                nextBtn.className = 'page-item';
+                const nextBtnLink = document.createElement('a');
+                nextBtnLink.className = 'page-link';
+                nextBtnLink.href = '#';
+                nextBtnLink.textContent = 'Next';
+                nextBtn.appendChild(nextBtnLink);
+                paginationControls.appendChild(nextBtn);
+
+                prevBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (currentPage > 1) {
+                        ShowProducts(currentPage - 1);
+                    }
+                });
+                nextBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (currentPage < totalPages) {
+                        ShowProducts(currentPage + 1);
+                    }
+                });
+            }
+
+            let currentPage = 1; // Initialize the current page
+            const itemsPerPage = 20; // Number of items per page
+
+            function ShowProducts(page = currentPage) {                
+                var url = `${API_BASE_URL}/products/?page=${page}`;
+                let options = {
+                    method: "GET",
+                };
+                let fetchRes = fetch(url, options);
+                fetchRes.then(res => {
+                    if (!res.ok) {
+                        return res.json().then(errorData => {
+                            console.error("API request failed:", errorData);
+                            throw new Error("Network response was not OK");
+                        });
+                    }
+                    return res.json(); // Return the JSON data promise
+                }).then(data => {
+                    if (data) {
+                        let tab = " ";
+                        for (let d of data.results) {   
+                            let Description = d.description.split(' ').slice(0, 7).join(' ');
+                            let product_desc = Description.split(' ').filter(word => word.length > 0).join(' ');
+                            if (d.description.split(' ').length > 7) {
+                                product_desc += '...';
+                            }                       
+                            tab += `                            
+                            <div class="col-md-6 col-lg-4 col-xl-3" style="min-height: 660px; overflow: hidden;">
+                                <div class="rounded position-relative fruite-item d-flex flex-column h-100">
+                                    <a href="#" onclick="ProductDetail(event, ${d.id})">
+                                        <div class="fruite-img">
+                                            <img src="${d.image}" class="img-fluid w-100 rounded-top" style="border: 1px solid #f78f20;" alt="">
+                                        </div>
+                                        <div class="p-4 border border-secondary border-top-0 rounded-bottom flex-grow-1 d-flex flex-column">
+                                            <div>
+                                                <h4>${d.title}</h4>
+                                                <p>${product_desc}</p>
+                                            </div>
+                                            <div class="mt-auto">
+                                                <div class="d-flex justify-content-between">
+                                                    <p class="text-dark fs-5 fw-bold mb-0">$ ${d.unit_price}</p>`
+                                                    //if (d.cart_set.length == 0)
+                                                    //   {
+                                                    tab += ` <a  class="btn border border-secondary rounded-pill px-3 text-primary custom-button" onclick="addToCartClicked(${d.id},${d.unit_price})"><i class="fa fa-shopping-bag me-2 text-primary"></i> Buy Now</a> `
+                            
+                                                    //  }
+                                                    tab += `</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>`;
+                        }
+                        loaderContainer.remove();  
+                        document.getElementById("products").innerHTML = tab; 
+                        if(data.results){
+                            updatePaginationControls(data.totalPages, page); // Update pagination controls
+                        }
+                        
+                    } else {
+                        console.log("API request failed or did not indicate success.");
+                    }
+                }).catch(error => {
+                    console.error("Error:", error);
+                });
+            }
+
+            function ProductDetail(event, product_id){
+                event.preventDefault();
+
+                if(decodedToken){
+                    const userId = decodedToken.user_id;
+                    const data = {
+                        product: product_id,
+                        user: userId,
+                    };
+
+                    const body = JSON.stringify(data);
+                    var url = `${API_BASE_URL}/products/history`;
+                    let options = {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            //'Authorization': 'Bearer ' + accesstoken,
+                        },
+                        body: JSON.stringify(data),
+                    };
+                
+                    let fetchRes = fetch(url, options);
+                    fetchRes.then(res => {                
+                        if (!res.ok) {
+                            return res.json().then(errorData => {
+                                console.error("API request failed:", errorData);
+                                throw new Error("Network response was not OK");
+                            });
+                        }
+                        return res.json();
+                    }).then(data => {
+                        if (data) {
+                            window.location.href = `${API_BASE_URL}/products/retrieve/${product_id}`;
+                        } else {
+                            console.log("API request failed or did not indicate success.");
+                        }
+                    }).catch(error => {
+                        console.error("Error:", error);
+                    });
+    
+                }
+
+                window.location.href = `${API_BASE_URL}/products/retrieve/${product_id}`;
+
+            }
+            
+            function addToCartClicked(pid, price) {
+                var accessToken = localStorage.getItem("AccessToken");
+                if (!accessToken) {
+                    alert("Please login for the order")
+                    window.location.href = `${API_BASE_URL}/auth/loginPage`;
+                }
+                showToast()
+                const userId = decodedToken.user_id;
+                const data = {
+                    quantity: 1,
+                    product: pid,
+                    user: userId,
+                    price: price
+                };
+            
+                // Convert the JSON object to a string
+                const body = JSON.stringify(data);
+            
+                var url = `${API_BASE_URL}/products/listing/`;
+            
+                let options = {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accesstoken,
+                    },
+                    body: JSON.stringify(data),
+                };
+            
+                let fetchRes = fetch(url, options);
+                fetchRes.then(res => {
+                    // Hide loader when response is received
+            
+                    if (!res.ok) {
+                        return res.json().then(errorData => {
+                            console.error("API request failed:", errorData);
+                            throw new Error("Network response was not OK");
+                        });
+                    }
+                    return res.json(); // Return the JSON data promise
+                }).then(data => {
+                    if (data) {
+                        $('#orderSuccessToast').toast('show');
+                            show_recomended_products();
+                    } else {
+                        console.log("API request failed or did not indicate success.");
+                    }
+                }).catch(error => {
+                    console.error("Error:", error);
+                });
+            } 
+            
+            function showToast() {
+                // Show the toast and set it to autohide after 5 seconds
+                $('#orderSuccessToast').toast({delay: 2000}); // 5000 milliseconds = 5 seconds
+                $('#orderSuccessToast').toast('show');
+
+            }           
+
+            let products_data = [];
+            async function render_recommended_products() {
+                let tab = `
+                    <h1>Recommended Products</h1>
+                    <div class="row mt-0 align-items-center">
+                        <div class="col-auto">
+                            <button class="btn btn-primary me-3" id="prevBtn"><i class="fas fa-chevron-left align-middle"></i></button>
+                        </div>
+                        <div class="col">
+                            <div class="d-flex flex-wrap">`;
+                for (let i = currentIndex; i < currentIndex + 3 && i < products_data.length; i++) {
+                    const d = products_data[i];
+                       
+                    tab += `
+                        <div class="col-lg-4 m-0">
+                            <div class="p-4 rounded bg-light m-lg-2">
+                                <div class="row align-items-center">
+                                    <div class="col-6">
+                                        <img src="${d.image}" class="img-fluid rounded-circle w-100" alt="">
+                                    </div>
+                                    <div class="col-6">
+                                        <a href="#" class="h5">${d.title}</a>
+                                        <h4 class="mb-3">${d.unit_price}$</h4>
+                                        <a href="#" class="btn border border-secondary rounded-pill px-3 text-primary" data-toggle="modal" data-target="#myModal" onclick="addToCartClicked(${d.id},${d.unit_price})"><i class="fa fa-shopping-bag me-2 text-primary"></i> Buy Now</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+                tab += `
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary" id="nextBtn"><i class="fas fa-chevron-right align-middle"></i></button>
+                        </div>
+                    </div>`;
+                document.getElementById("recommended_products_container").innerHTML = tab;
+            
+                document.getElementById('prevBtn').addEventListener('click', function() {
+                    console.log("BUtton clicked")
+                    if (currentIndex > 0) {
+                        currentIndex -= 3;
+                        render_recommended_products();
+                    }
+                });
+            
+                document.getElementById('nextBtn').addEventListener('click', function() {
+                    console.log("Next Button clicked", currentIndex)
+                    if (currentIndex + 3 < products_data.length) {
+                        currentIndex += 3;
+                        console.log("Inside Log", currentIndex)
+                        render_recommended_products();
+                    }
+                });
+            }
+              
+            
+            function show_recomended_products() {
+                const userId = decodedToken.user_id;
+                url = `${API_BASE_URL}/products/recommended/products/${userId}`
+                const accesstoken = localStorage.getItem("AccessToken")
+                let options = {
+                    method: "GET",
+                    headers: {
+                        'Authorization': 'Bearer ' + accesstoken,
+                    },
+                }
+                let fetchRes = fetch(url, options);
+                fetchRes.then(res => {
+                    if (!res.ok) {
+                        return res.json().then(errorData => {
+                            console.error("API request failed:", errorData);
+                        });
+                    }
+                    return res.json();  // Return the JSON data promise
+                }).then(data => {
+                    products_data = data;
+                    if (products_data) {
+                        if(Object.keys(products_data).length != 0){
+                            render_recommended_products()
+                        }
+                        } else {
+                        console.log("API request failed or did not indicate success.");
+                    }
+                }).catch(error => {
+                    console.error("Error:", error);
+                });
+            }
+
+            
+        </script> 
+
+{% endblock content %}
